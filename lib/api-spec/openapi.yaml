@@ -1,0 +1,415 @@
+openapi: 3.1.0
+info:
+  title: Api
+  version: 0.1.0
+  description: WhatsApp Bot Hosting Panel API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: bots
+    description: Bot management operations
+
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /bots:
+    get:
+      operationId: listBots
+      tags: [bots]
+      summary: List all bots
+      responses:
+        "200":
+          description: List of bots
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Bot"
+    post:
+      operationId: createBot
+      tags: [bots]
+      summary: Create a new bot from a git repository
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BotInput"
+      responses:
+        "201":
+          description: Bot created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bot"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /bots/{id}:
+    get:
+      operationId: getBot
+      tags: [bots]
+      summary: Get bot by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Bot details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bot"
+        "404":
+          description: Bot not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      operationId: updateBot
+      tags: [bots]
+      summary: Update bot configuration
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BotUpdate"
+      responses:
+        "200":
+          description: Bot updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bot"
+        "404":
+          description: Bot not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: deleteBot
+      tags: [bots]
+      summary: Delete a bot
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Bot deleted
+        "404":
+          description: Bot not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /bots/{id}/start:
+    post:
+      operationId: startBot
+      tags: [bots]
+      summary: Start a bot
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Bot started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bot"
+        "404":
+          description: Bot not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /bots/{id}/stop:
+    post:
+      operationId: stopBot
+      tags: [bots]
+      summary: Stop a bot
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Bot stopped
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bot"
+        "404":
+          description: Bot not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /bots/{id}/restart:
+    post:
+      operationId: restartBot
+      tags: [bots]
+      summary: Restart a bot
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Bot restarted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bot"
+        "404":
+          description: Bot not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /bots/{id}/install:
+    post:
+      operationId: installBotDeps
+      tags: [bots]
+      summary: Install bot dependencies (npm install / yarn install)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Install result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PullResult"
+        "404":
+          description: Bot not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /bots/{id}/pull:
+    post:
+      operationId: pullBot
+      tags: [bots]
+      summary: Pull latest changes from git repository
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Git pull result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PullResult"
+        "404":
+          description: Bot not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /bots/{id}/terminal/input:
+    post:
+      operationId: sendTerminalInput
+      tags: [bots]
+      summary: Send input to bot terminal (e.g. phone number prompt)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TerminalInput"
+      responses:
+        "200":
+          description: Input sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "404":
+          description: Bot not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /bots/{id}/logs:
+    get:
+      operationId: getBotLogs
+      tags: [bots]
+      summary: Get recent bot logs
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Bot logs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LogsResponse"
+        "404":
+          description: Bot not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    Bot:
+      type: object
+      required: [id, name, gitUrl, command, status, createdAt]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        gitUrl:
+          type: string
+        command:
+          type: string
+        status:
+          type: string
+          enum: [stopped, starting, running, error]
+        pid:
+          type: ["integer", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    BotInput:
+      type: object
+      required: [name, gitUrl, command]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        gitUrl:
+          type: string
+          minLength: 1
+        command:
+          type: string
+          minLength: 1
+          description: "Command to start the bot, e.g. 'node index.js' or 'npm start'"
+
+    BotUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+        command:
+          type: string
+          minLength: 1
+        gitUrl:
+          type: string
+          minLength: 1
+
+    PullResult:
+      type: object
+      required: [output]
+      properties:
+        output:
+          type: string
+
+    TerminalInput:
+      type: object
+      required: [text]
+      properties:
+        text:
+          type: string
+
+    LogsResponse:
+      type: object
+      required: [logs]
+      properties:
+        logs:
+          type: string
+
+    OkResponse:
+      type: object
+      required: [ok]
+      properties:
+        ok:
+          type: boolean
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
