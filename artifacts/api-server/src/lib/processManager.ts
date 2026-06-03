@@ -33,15 +33,28 @@ export function getProcess(botId: number): BotProcess | undefined {
   return runningProcesses.get(botId);
 }
 
-export function isRunning(botId: number): boolean {
+export function isRunning(botId: number, fallbackPid?: number | null): boolean {
   const bp = runningProcesses.get(botId);
-  if (!bp) return false;
-  try {
-    process.kill(bp.pid, 0);
-    return true;
-  } catch {
-    return false;
+  if (bp) {
+    try {
+      process.kill(bp.pid, 0);
+      return true;
+    } catch {
+      runningProcesses.delete(botId);
+      return false;
+    }
   }
+  // After API server restart the in-memory map is empty but the bot process
+  // may still be alive — check the PID stored in the database.
+  if (fallbackPid) {
+    try {
+      process.kill(fallbackPid, 0);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  return false;
 }
 
 export function getLogs(botId: number): string {
@@ -103,8 +116,12 @@ export function startProcess(botId: number, command: string): BotProcess {
     }
   }
 
+  // Strip ANSI escape codes so the terminal shows clean text
+  const stripAnsi = (str: string) =>
+    str.replace(/\x1B(?:\[[0-9;]*[mGKHFJ]|\][^\x07]*\x07|[()][A-Z0-9])/g, "");
+
   const appendLog = (data: Buffer) => {
-    const text = data.toString();
+    const text = stripAnsi(data.toString());
     bp.logs.push(text);
     if (bp.logs.length > MAX_LOG_LINES) {
       bp.logs = bp.logs.slice(-MAX_LOG_LINES);

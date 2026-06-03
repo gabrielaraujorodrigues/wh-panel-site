@@ -20,7 +20,7 @@ if (Number.isNaN(port) || port <= 0) {
 
 const server = http.createServer(app);
 
-const wss = new WebSocketServer({ server, path: "/ws" });
+const wss = new WebSocketServer({ server });
 
 wss.on("connection", (ws, req) => {
   const url = req.url ?? "";

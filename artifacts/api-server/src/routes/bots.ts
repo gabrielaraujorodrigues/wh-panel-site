@@ -48,7 +48,7 @@ router.get("/bots", async (req, res) => {
   try {
     const bots = await db.select().from(botsTable).orderBy(botsTable.id);
     for (const bot of bots) {
-      if (!isRunning(bot.id) && (bot.status === "running" || bot.status === "starting")) {
+      if (!isRunning(bot.id, bot.pid) && (bot.status === "running" || bot.status === "starting")) {
         bot.status = "stopped";
         bot.pid = null;
       }
@@ -100,7 +100,7 @@ router.get("/bots/:id", async (req, res) => {
     const { id } = GetBotParams.parse({ id: Number(req.params.id) });
     const [bot] = await db.select().from(botsTable).where(eq(botsTable.id, id)).limit(1);
     if (!bot) return res.status(404).json({ error: "Bot not found" });
-    if (!isRunning(id) && (bot.status === "running" || bot.status === "starting")) {
+    if (!isRunning(id, bot.pid) && (bot.status === "running" || bot.status === "starting")) {
       bot.status = "stopped";
       bot.pid = null;
       await db.update(botsTable).set({ status: "stopped", pid: null, updatedAt: new Date() }).where(eq(botsTable.id, id));
