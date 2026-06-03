@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams, Link } from "wouter";
+import { useParams, Link, useLocation } from "wouter";
 import {
   useGetBot,
   useStartBot,
@@ -8,6 +8,7 @@ import {
   usePullBot,
   useInstallBotDeps,
   useSendTerminalInput,
+  useDeleteBot,
   getGetBotQueryKey,
   getListBotsQueryKey,
 } from "@workspace/api-client-react";
@@ -29,6 +30,8 @@ import {
   Terminal as TerminalIcon,
   Package,
   Zap,
+  Trash2,
+  AlertTriangle,
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -37,8 +40,10 @@ export default function BotDetail() {
   const botId = parseInt(params.id || "0", 10);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, navigate] = useLocation();
   const [setupLog, setSetupLog] = useState<string | null>(null);
   const [isSettingUp, setIsSettingUp] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const { data: bot, isLoading } = useGetBot(botId, {
     query: {
@@ -53,10 +58,28 @@ export default function BotDetail() {
   const restartBot = useRestartBot();
   const pullBot = usePullBot();
   const installDeps = useInstallBotDeps();
+  const deleteBot = useDeleteBot();
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: getGetBotQueryKey(botId) });
     queryClient.invalidateQueries({ queryKey: getListBotsQueryKey() });
+  };
+
+  const handleDelete = () => {
+    deleteBot.mutate(
+      { id: botId },
+      {
+        onSuccess: () => {
+          toast({ title: "Servidor excluído", description: "Bot removido com sucesso." });
+          queryClient.invalidateQueries({ queryKey: getListBotsQueryKey() });
+          navigate("/");
+        },
+        onError: () => {
+          toast({ title: "Erro ao excluir", description: "Não foi possível remover o bot.", variant: "destructive" });
+          setConfirmDelete(false);
+        },
+      }
+    );
   };
 
   const handleAction = (action: ReturnType<typeof useStartBot>, label: string) => {
@@ -289,6 +312,58 @@ export default function BotDetail() {
           <TerminalIcon className="w-4 h-4" /> Terminal ao Vivo
         </h3>
         <Terminal botId={botId} status={bot.status} />
+      </div>
+
+      {/* Zona de perigo — Excluir Servidor */}
+      <div className="border border-destructive/30 rounded-lg p-4 space-y-3 bg-destructive/5">
+        <div className="flex items-center gap-2 text-destructive">
+          <AlertTriangle className="w-4 h-4" />
+          <span className="text-sm font-semibold uppercase tracking-widest">Zona de Perigo</span>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Excluir remove permanentemente o bot, todos os arquivos e a sessão do WhatsApp. Esta ação não pode ser desfeita.
+        </p>
+
+        {!confirmDelete ? (
+          <Button
+            variant="outline"
+            size="sm"
+            className="border-destructive/50 text-destructive hover:bg-destructive hover:text-destructive-foreground"
+            onClick={() => setConfirmDelete(true)}
+          >
+            <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+            Excluir Servidor
+          </Button>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-destructive">
+              ⚠️ Tem certeza? Isso apagará TUDO — arquivos, sessão e banco de dados.
+            </p>
+            <div className="flex gap-2">
+              <Button
+                variant="destructive"
+                size="sm"
+                disabled={deleteBot.isPending}
+                onClick={handleDelete}
+              >
+                {deleteBot.isPending ? (
+                  <RefreshCw className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                ) : (
+                  <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+                )}
+                {deleteBot.isPending ? "Excluindo..." : "Sim, excluir tudo"}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setConfirmDelete(false)}
+                disabled={deleteBot.isPending}
+              >
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
