@@ -28,6 +28,7 @@ import type {
   LogsResponse,
   OkResponse,
   PullResult,
+  SystemInfo,
   TerminalInput
 } from './api.schemas';
 
@@ -707,7 +708,7 @@ export const getInstallBotDepsUrl = (id: number,) => {
 }
 
 /**
- * @summary Install bot dependencies (npm install / yarn install)
+ * @summary Install bot dependencies
  */
 export const installBotDeps = async (id: number, options?: RequestInit): Promise<PullResult> => {
 
@@ -755,7 +756,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type InstallBotDepsMutationError = ErrorType<ErrorResponse>
 
     /**
- * @summary Install bot dependencies (npm install / yarn install)
+ * @summary Install bot dependencies
  */
 export const useInstallBotDeps = <TError = ErrorType<ErrorResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof installBotDeps>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
@@ -847,7 +848,7 @@ export const getSendTerminalInputUrl = (id: number,) => {
 }
 
 /**
- * @summary Send input to bot terminal (e.g. phone number prompt)
+ * @summary Send input to bot terminal
  */
 export const sendTerminalInput = async (id: number,
     terminalInput: TerminalInput, options?: RequestInit): Promise<OkResponse> => {
@@ -897,7 +898,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type SendTerminalInputMutationError = ErrorType<ErrorResponse>
 
     /**
- * @summary Send input to bot terminal (e.g. phone number prompt)
+ * @summary Send input to bot terminal
  */
 export const useSendTerminalInput = <TError = ErrorType<ErrorResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendTerminalInput>>, TError,{id: number;data: BodyType<TerminalInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
@@ -975,6 +976,83 @@ export function useGetBotLogs<TData = Awaited<ReturnType<typeof getBotLogs>>, TE
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetBotLogsQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetSystemInfoUrl = () => {
+
+
+
+
+  return `/api/system/info`
+}
+
+/**
+ * @summary Get system info (Node version, etc.)
+ */
+export const getSystemInfo = async ( options?: RequestInit): Promise<SystemInfo> => {
+
+  return customFetch<SystemInfo>(getGetSystemInfoUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetSystemInfoQueryKey = () => {
+    return [
+    `/api/system/info`
+    ] as const;
+    }
+
+
+export const getGetSystemInfoQueryOptions = <TData = Awaited<ReturnType<typeof getSystemInfo>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSystemInfo>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSystemInfoQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSystemInfo>>> = ({ signal }) => getSystemInfo({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSystemInfo>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetSystemInfoQueryResult = NonNullable<Awaited<ReturnType<typeof getSystemInfo>>>
+export type GetSystemInfoQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get system info (Node version, etc.)
+ */
+
+export function useGetSystemInfo<TData = Awaited<ReturnType<typeof getSystemInfo>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSystemInfo>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetSystemInfoQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

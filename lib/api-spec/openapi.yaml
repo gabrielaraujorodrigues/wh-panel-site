@@ -1,5 +1,6 @@
 openapi: 3.1.0
 info:
+  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
   description: WhatsApp Bot Hosting Panel API
@@ -217,7 +218,7 @@ paths:
     post:
       operationId: installBotDeps
       tags: [bots]
-      summary: Install bot dependencies (npm install / yarn install)
+      summary: Install bot dependencies
       parameters:
         - name: id
           in: path
@@ -267,19 +268,13 @@ paths:
     post:
       operationId: sendTerminalInput
       tags: [bots]
-      summary: Send input to bot terminal (e.g. phone number prompt)
+      summary: Send input to bot terminal
       parameters:
         - name: id
           in: path
           required: true
           schema:
             type: integer
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/TerminalInput"
       responses:
         "200":
           description: Input sent
@@ -293,6 +288,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TerminalInput"
 
   /bots/{id}/logs:
     get:
@@ -319,6 +320,19 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /system/info:
+    get:
+      operationId: getSystemInfo
+      tags: [health]
+      summary: Get system info (Node version, etc.)
+      responses:
+        "200":
+          description: System info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SystemInfo"
+
 components:
   schemas:
     HealthStatus:
@@ -329,9 +343,18 @@ components:
       required:
         - status
 
+    SystemInfo:
+      type: object
+      required: [nodeVersion, platform]
+      properties:
+        nodeVersion:
+          type: string
+        platform:
+          type: string
+
     Bot:
       type: object
-      required: [id, name, gitUrl, command, status, createdAt]
+      required: [id, name, gitUrl, command, status, autoRestart, createdAt]
       properties:
         id:
           type: integer
@@ -346,6 +369,14 @@ components:
           enum: [stopped, starting, running, error]
         pid:
           type: ["integer", "null"]
+        autoRestart:
+          type: boolean
+        gitToken:
+          type: ["string", "null"]
+          description: "GitHub token for private repositories"
+        installCommand:
+          type: ["string", "null"]
+          description: "Custom dependency install command (e.g. npm install --legacy-peer-deps)"
         createdAt:
           type: string
         updatedAt:
@@ -364,7 +395,15 @@ components:
         command:
           type: string
           minLength: 1
-          description: "Command to start the bot, e.g. 'node index.js' or 'npm start'"
+        autoRestart:
+          type: boolean
+          default: true
+        gitToken:
+          type: string
+          description: "GitHub token for private repositories"
+        installCommand:
+          type: string
+          description: "Dependency install command (default: npm install --legacy-peer-deps)"
 
     BotUpdate:
       type: object
@@ -378,6 +417,12 @@ components:
         gitUrl:
           type: string
           minLength: 1
+        autoRestart:
+          type: boolean
+        gitToken:
+          type: string
+        installCommand:
+          type: string
 
     PullResult:
       type: object

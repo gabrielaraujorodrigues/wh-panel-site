@@ -27,6 +27,9 @@ export const ListBotsResponseItem = zod.object({
   "command": zod.string(),
   "status": zod.enum(['stopped', 'starting', 'running', 'error']),
   "pid": zod.number().nullish(),
+  "autoRestart": zod.boolean(),
+  "gitToken": zod.string().nullish().describe('GitHub token for private repositories'),
+  "installCommand": zod.string().nullish().describe('Custom dependency install command (e.g. npm install --legacy-peer-deps)'),
   "createdAt": zod.string(),
   "updatedAt": zod.string().optional()
 })
@@ -39,12 +42,15 @@ export const ListBotsResponse = zod.array(ListBotsResponseItem)
 
 
 
-
+export const createBotBodyAutoRestartDefault = true;
 
 export const CreateBotBody = zod.object({
   "name": zod.string().min(1),
   "gitUrl": zod.string().min(1),
-  "command": zod.string().min(1).describe('Command to start the bot, e.g. \'node index.js\' or \'npm start\'')
+  "command": zod.string().min(1),
+  "autoRestart": zod.boolean().default(createBotBodyAutoRestartDefault),
+  "gitToken": zod.string().optional().describe('GitHub token for private repositories'),
+  "installCommand": zod.string().optional().describe('Dependency install command (default: npm install --legacy-peer-deps)')
 })
 
 
@@ -62,6 +68,9 @@ export const GetBotResponse = zod.object({
   "command": zod.string(),
   "status": zod.enum(['stopped', 'starting', 'running', 'error']),
   "pid": zod.number().nullish(),
+  "autoRestart": zod.boolean(),
+  "gitToken": zod.string().nullish().describe('GitHub token for private repositories'),
+  "installCommand": zod.string().nullish().describe('Custom dependency install command (e.g. npm install --legacy-peer-deps)'),
   "createdAt": zod.string(),
   "updatedAt": zod.string().optional()
 })
@@ -82,7 +91,10 @@ export const UpdateBotParams = zod.object({
 export const UpdateBotBody = zod.object({
   "name": zod.string().min(1).optional(),
   "command": zod.string().min(1).optional(),
-  "gitUrl": zod.string().min(1).optional()
+  "gitUrl": zod.string().min(1).optional(),
+  "autoRestart": zod.boolean().optional(),
+  "gitToken": zod.string().optional(),
+  "installCommand": zod.string().optional()
 })
 
 export const UpdateBotResponse = zod.object({
@@ -92,6 +104,9 @@ export const UpdateBotResponse = zod.object({
   "command": zod.string(),
   "status": zod.enum(['stopped', 'starting', 'running', 'error']),
   "pid": zod.number().nullish(),
+  "autoRestart": zod.boolean(),
+  "gitToken": zod.string().nullish().describe('GitHub token for private repositories'),
+  "installCommand": zod.string().nullish().describe('Custom dependency install command (e.g. npm install --legacy-peer-deps)'),
   "createdAt": zod.string(),
   "updatedAt": zod.string().optional()
 })
@@ -119,6 +134,9 @@ export const StartBotResponse = zod.object({
   "command": zod.string(),
   "status": zod.enum(['stopped', 'starting', 'running', 'error']),
   "pid": zod.number().nullish(),
+  "autoRestart": zod.boolean(),
+  "gitToken": zod.string().nullish().describe('GitHub token for private repositories'),
+  "installCommand": zod.string().nullish().describe('Custom dependency install command (e.g. npm install --legacy-peer-deps)'),
   "createdAt": zod.string(),
   "updatedAt": zod.string().optional()
 })
@@ -138,6 +156,9 @@ export const StopBotResponse = zod.object({
   "command": zod.string(),
   "status": zod.enum(['stopped', 'starting', 'running', 'error']),
   "pid": zod.number().nullish(),
+  "autoRestart": zod.boolean(),
+  "gitToken": zod.string().nullish().describe('GitHub token for private repositories'),
+  "installCommand": zod.string().nullish().describe('Custom dependency install command (e.g. npm install --legacy-peer-deps)'),
   "createdAt": zod.string(),
   "updatedAt": zod.string().optional()
 })
@@ -157,13 +178,16 @@ export const RestartBotResponse = zod.object({
   "command": zod.string(),
   "status": zod.enum(['stopped', 'starting', 'running', 'error']),
   "pid": zod.number().nullish(),
+  "autoRestart": zod.boolean(),
+  "gitToken": zod.string().nullish().describe('GitHub token for private repositories'),
+  "installCommand": zod.string().nullish().describe('Custom dependency install command (e.g. npm install --legacy-peer-deps)'),
   "createdAt": zod.string(),
   "updatedAt": zod.string().optional()
 })
 
 
 /**
- * @summary Install bot dependencies (npm install / yarn install)
+ * @summary Install bot dependencies
  */
 export const InstallBotDepsParams = zod.object({
   "id": zod.coerce.number()
@@ -187,7 +211,7 @@ export const PullBotResponse = zod.object({
 
 
 /**
- * @summary Send input to bot terminal (e.g. phone number prompt)
+ * @summary Send input to bot terminal
  */
 export const SendTerminalInputParams = zod.object({
   "id": zod.coerce.number()
@@ -211,6 +235,15 @@ export const GetBotLogsParams = zod.object({
 
 export const GetBotLogsResponse = zod.object({
   "logs": zod.string()
+})
+
+
+/**
+ * @summary Get system info (Node version, etc.)
+ */
+export const GetSystemInfoResponse = zod.object({
+  "nodeVersion": zod.string(),
+  "platform": zod.string()
 })
 
 

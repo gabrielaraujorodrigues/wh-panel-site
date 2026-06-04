@@ -27,9 +27,31 @@ import {
   isRunning,
   getLogs,
   sendInput,
+  setDbRestartCallback,
 } from "../lib/processManager";
 
 const router: IRouter = Router();
+
+setDbRestartCallback(async (botId, pid) => {
+  await db
+    .update(botsTable)
+    .set({ status: "running", pid, updatedAt: new Date() })
+    .where(eq(botsTable.id, botId));
+});
+
+/** Build an authenticated clone URL if the plain URL + token are provided */
+function buildCloneUrl(gitUrl: string, gitToken?: string | null): string {
+  if (!gitToken) return gitUrl;
+  try {
+    const u = new URL(gitUrl);
+    // Inject token into URL: https://token@github.com/user/repo
+    u.username = gitToken;
+    u.password = "";
+    return u.toString();
+  } catch {
+    return gitUrl;
+  }
+}
 
 function formatBot(bot: typeof botsTable.$inferSelect) {
   return {
@@ -39,10 +61,24 @@ function formatBot(bot: typeof botsTable.$inferSelect) {
     command: bot.command,
     status: bot.status,
     pid: bot.pid ?? null,
+    autoRestart: bot.autoRestart,
+    gitToken: bot.gitToken ?? null,
+    installCommand: bot.installCommand ?? null,
     createdAt: bot.createdAt.toISOString(),
     updatedAt: bot.updatedAt.toISOString(),
   };
 }
+
+// ─── System info ────────────────────────────────────────────────────────────
+
+router.get("/system/info", (_req, res) => {
+  return res.json({
+    nodeVersion: process.version,
+    platform: process.platform,
+  });
+});
+
+// ─── List bots ───────────────────────────────────────────────────────────────
 
 router.get("/bots", async (req, res) => {
   try {
@@ -60,6 +96,8 @@ router.get("/bots", async (req, res) => {
   }
 });
 
+// ─── Create bot ──────────────────────────────────────────────────────────────
+
 router.post("/bots", async (req, res) => {
   try {
     const body = CreateBotBody.parse(req.body);
@@ -70,14 +108,18 @@ router.post("/bots", async (req, res) => {
       gitUrl: body.gitUrl,
       command: body.command,
       status: "stopped",
+      autoRestart: body.autoRestart ?? true,
+      gitToken: body.gitToken ?? null,
+      installCommand: body.installCommand ?? null,
     }).returning();
 
     const botDir = getBotDir(bot.id);
+    const cloneUrl = buildCloneUrl(body.gitUrl, body.gitToken);
 
     res.status(201).json(formatBot(bot));
 
     try {
-      execSync(`git clone "${body.gitUrl}" "${botDir}"`, { timeout: 120000 });
+      execSync(`git clone "${cloneUrl}" "${botDir}"`, { timeout: 120000 });
       req.log.info({ botId: bot.id }, "Bot repository cloned");
     } catch (cloneErr) {
       req.log.error({ err: cloneErr, botId: bot.id }, "Failed to clone repository");
@@ -94,6 +136,8 @@ router.post("/bots", async (req, res) => {
     return res.status(500).json({ error: "Internal server error" });
   }
 });
+
+// ─── Get bot ─────────────────────────────────────────────────────────────────
 
 router.get("/bots/:id", async (req, res) => {
   try {
@@ -112,6 +156,8 @@ router.get("/bots/:id", async (req, res) => {
   }
 });
 
+// ─── Update bot ──────────────────────────────────────────────────────────────
+
 router.patch("/bots/:id", async (req, res) => {
   try {
     const { id } = UpdateBotParams.parse({ id: Number(req.params.id) });
@@ -123,6 +169,9 @@ router.patch("/bots/:id", async (req, res) => {
     if (body.name !== undefined) updates.name = body.name;
     if (body.command !== undefined) updates.command = body.command;
     if (body.gitUrl !== undefined) updates.gitUrl = body.gitUrl;
+    if (body.autoRestart !== undefined) updates.autoRestart = body.autoRestart;
+    if (body.gitToken !== undefined) updates.gitToken = body.gitToken;
+    if (body.installCommand !== undefined) updates.installCommand = body.installCommand;
 
     const [updated] = await db.update(botsTable).set(updates).where(eq(botsTable.id, id)).returning();
     return res.json(formatBot(updated));
@@ -131,6 +180,8 @@ router.patch("/bots/:id", async (req, res) => {
     return res.status(500).json({ error: "Internal server error" });
   }
 });
+
+// ─── Delete bot ──────────────────────────────────────────────────────────────
 
 router.delete("/bots/:id", async (req, res) => {
   try {
@@ -153,6 +204,8 @@ router.delete("/bots/:id", async (req, res) => {
   }
 });
 
+// ─── Start ───────────────────────────────────────────────────────────────────
+
 router.post("/bots/:id/start", async (req, res) => {
   try {
     const { id } = StartBotParams.parse({ id: Number(req.params.id) });
@@ -168,7 +221,7 @@ router.post("/bots/:id/start", async (req, res) => {
       return res.status(400).json({ error: "Diretório do bot não encontrado. Clone o repositório primeiro." });
     }
 
-    const bp = startProcess(id, bot.command);
+    const bp = startProcess(id, bot.command, bot.autoRestart);
     const [updated] = await db.update(botsTable)
       .set({ status: "running", pid: bp.pid, updatedAt: new Date() })
       .where(eq(botsTable.id, id))
@@ -180,6 +233,8 @@ router.post("/bots/:id/start", async (req, res) => {
     return res.status(500).json({ error: "Internal server error" });
   }
 });
+
+// ─── Stop ────────────────────────────────────────────────────────────────────
 
 router.post("/bots/:id/stop", async (req, res) => {
   try {
@@ -200,6 +255,8 @@ router.post("/bots/:id/stop", async (req, res) => {
   }
 });
 
+// ─── Restart ─────────────────────────────────────────────────────────────────
+
 router.post("/bots/:id/restart", async (req, res) => {
   try {
     const { id } = RestartBotParams.parse({ id: Number(req.params.id) });
@@ -214,7 +271,7 @@ router.post("/bots/:id/restart", async (req, res) => {
       return res.status(400).json({ error: "Diretório do bot não encontrado." });
     }
 
-    const bp = startProcess(id, bot.command);
+    const bp = startProcess(id, bot.command, bot.autoRestart);
     const [updated] = await db.update(botsTable)
       .set({ status: "running", pid: bp.pid, updatedAt: new Date() })
       .where(eq(botsTable.id, id))
@@ -227,6 +284,8 @@ router.post("/bots/:id/restart", async (req, res) => {
   }
 });
 
+// ─── Install deps ────────────────────────────────────────────────────────────
+
 router.post("/bots/:id/install", async (req, res) => {
   try {
     const { id } = InstallBotDepsParams.parse({ id: Number(req.params.id) });
@@ -235,15 +294,19 @@ router.post("/bots/:id/install", async (req, res) => {
 
     const botDir = getBotDir(id);
     if (!fs.existsSync(botDir)) {
-      return res.status(400).json({ error: "Diretório do bot não encontrado. Clone o repositório primeiro." });
+      return res.status(400).json({ error: "Diretório do bot não encontrado." });
     }
 
-    const hasYarn = fs.existsSync(`${botDir}/yarn.lock`);
-    const hasPnpm = fs.existsSync(`${botDir}/pnpm-lock.yaml`);
-    const installCmd = hasPnpm ? "pnpm install" : hasYarn ? "yarn install" : "npm install";
+    // Determine install command: explicit > auto-detect > default
+    let installCmd = bot.installCommand;
+    if (!installCmd) {
+      const hasYarn = fs.existsSync(`${botDir}/yarn.lock`);
+      const hasPnpm = fs.existsSync(`${botDir}/pnpm-lock.yaml`);
+      installCmd = hasPnpm ? "pnpm install" : hasYarn ? "yarn install" : "npm install --legacy-peer-deps";
+    }
 
-    exec(installCmd, { cwd: botDir, timeout: 180000 }, (err, stdout, stderr) => {
-      const output = (stdout + stderr).trim() || "Done.";
+    exec(installCmd, { cwd: botDir, timeout: 300000 }, (err, stdout, stderr) => {
+      const output = (stdout + stderr).trim() || "Concluído.";
       if (err) req.log.error({ err, botId: id }, "Install failed");
       res.json({ output });
     });
@@ -253,6 +316,8 @@ router.post("/bots/:id/install", async (req, res) => {
     return res.status(500).json({ error: "Internal server error" });
   }
 });
+
+// ─── Git pull ────────────────────────────────────────────────────────────────
 
 router.post("/bots/:id/pull", async (req, res) => {
   try {
@@ -265,7 +330,13 @@ router.post("/bots/:id/pull", async (req, res) => {
       return res.status(400).json({ error: "Repositório não clonado ainda." });
     }
 
-    exec(`git -C "${botDir}" pull`, { timeout: 60000 }, (err, stdout, stderr) => {
+    // If bot has token, configure git credential for pull
+    const token = bot.gitToken;
+    const pullCmd = token
+      ? `git -C "${botDir}" -c credential.helper= -c http.extraHeader="Authorization: Bearer ${token}" pull`
+      : `git -C "${botDir}" pull`;
+
+    exec(pullCmd, { timeout: 60000 }, (err, stdout, stderr) => {
       const output = (stdout + stderr).trim() || "Already up to date.";
       if (err) req.log.error({ err, botId: id }, "Git pull failed");
       res.json({ output });
@@ -276,6 +347,8 @@ router.post("/bots/:id/pull", async (req, res) => {
     return res.status(500).json({ error: "Internal server error" });
   }
 });
+
+// ─── Terminal input ──────────────────────────────────────────────────────────
 
 router.post("/bots/:id/terminal/input", async (req, res) => {
   try {
@@ -291,6 +364,8 @@ router.post("/bots/:id/terminal/input", async (req, res) => {
     return res.status(500).json({ error: "Internal server error" });
   }
 });
+
+// ─── Logs ────────────────────────────────────────────────────────────────────
 
 router.get("/bots/:id/logs", async (req, res) => {
   try {

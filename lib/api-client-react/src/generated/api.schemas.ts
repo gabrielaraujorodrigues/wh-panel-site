@@ -9,6 +9,11 @@ export interface HealthStatus {
   status: string;
 }
 
+export interface SystemInfo {
+  nodeVersion: string;
+  platform: string;
+}
+
 export type BotStatus = typeof BotStatus[keyof typeof BotStatus];
 
 
@@ -27,6 +32,17 @@ export interface Bot {
   status: BotStatus;
   /** @nullable */
   pid?: number | null;
+  autoRestart: boolean;
+  /**
+     * GitHub token for private repositories
+     * @nullable
+     */
+  gitToken?: string | null;
+  /**
+     * Custom dependency install command (e.g. npm install --legacy-peer-deps)
+     * @nullable
+     */
+  installCommand?: string | null;
   createdAt: string;
   updatedAt?: string;
 }
@@ -36,11 +52,13 @@ export interface BotInput {
   name: string;
   /** @minLength 1 */
   gitUrl: string;
-  /**
-     * Command to start the bot, e.g. 'node index.js' or 'npm start'
-     * @minLength 1
-     */
+  /** @minLength 1 */
   command: string;
+  autoRestart?: boolean;
+  /** GitHub token for private repositories */
+  gitToken?: string;
+  /** Dependency install command (default: npm install --legacy-peer-deps) */
+  installCommand?: string;
 }
 
 export interface BotUpdate {
@@ -50,6 +68,9 @@ export interface BotUpdate {
   command?: string;
   /** @minLength 1 */
   gitUrl?: string;
+  autoRestart?: boolean;
+  gitToken?: string;
+  installCommand?: string;
 }
 
 export interface PullResult {
