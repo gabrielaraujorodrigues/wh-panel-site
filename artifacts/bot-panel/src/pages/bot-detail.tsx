@@ -32,10 +32,11 @@ import {
 import { format } from "date-fns";
 
 const INSTALL_OPTIONS = [
+  "npm install --legacy-peer-deps --ignore-engines",
   "npm install --legacy-peer-deps",
   "npm install",
-  "yarn install",
-  "pnpm install",
+  "yarn install --ignore-engines --network-timeout 60000",
+  "pnpm install --ignore-workspace",
 ];
 
 export default function BotDetail() {
@@ -51,7 +52,14 @@ export default function BotDetail() {
   const [editToken, setEditToken] = useState<string | null>(null);
 
   const { data: bot, isLoading } = useGetBot(botId, {
-    query: { enabled: !!botId, refetchInterval: 3000, queryKey: getGetBotQueryKey(botId) },
+    query: {
+      enabled: !!botId,
+      refetchInterval: (query) => {
+        const s = (query.state.data as { status?: string } | undefined)?.status;
+        return s === "running" || s === "starting" ? 2000 : 8000;
+      },
+      queryKey: getGetBotQueryKey(botId),
+    },
   });
 
   const { data: sysInfo } = useGetSystemInfo({ query: { staleTime: 60000 } });
@@ -179,11 +187,10 @@ export default function BotDetail() {
     <Badge className="bg-destructive/10 text-destructive border-destructive/30" variant="outline">Erro</Badge>
   );
 
-  const currentInstallCmd = editInstallCmd ?? bot.installCommand ?? "npm install --legacy-peer-deps";
+  const currentInstallCmd = editInstallCmd ?? bot.installCommand ?? "npm install --legacy-peer-deps --ignore-engines";
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 pb-12">
-      {/* Header */}
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" asChild>
           <Link href="/"><ArrowLeft className="h-4 w-4" /></Link>
@@ -202,7 +209,6 @@ export default function BotDetail() {
         </div>
       </div>
 
-      {/* Node version badge */}
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         <Cpu className="w-3.5 h-3.5 text-primary" />
         <span>Ambiente:</span>
@@ -219,7 +225,6 @@ export default function BotDetail() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Controls */}
         <Card className="md:col-span-2 border-border bg-card">
           <CardHeader className="pb-3">
             <CardTitle className="text-xs uppercase tracking-widest text-muted-foreground">Controles</CardTitle>
@@ -266,7 +271,6 @@ export default function BotDetail() {
               </Button>
             </div>
 
-            {/* Auto-restart */}
             <div className="flex items-center justify-between pt-2 border-t border-border">
               <div>
                 <Label htmlFor="auto-restart" className="text-sm font-medium flex items-center gap-1.5">
@@ -279,7 +283,6 @@ export default function BotDetail() {
           </CardContent>
         </Card>
 
-        {/* Info */}
         <Card className="border-border bg-card">
           <CardHeader className="pb-3">
             <CardTitle className="text-xs uppercase tracking-widest text-muted-foreground">Info</CardTitle>
@@ -306,7 +309,6 @@ export default function BotDetail() {
         </Card>
       </div>
 
-      {/* Install command config */}
       <Card className="border-border bg-card">
         <CardHeader className="pb-3">
           <CardTitle className="text-xs uppercase tracking-widest text-muted-foreground flex items-center gap-2">
@@ -335,21 +337,20 @@ export default function BotDetail() {
               value={currentInstallCmd}
               onChange={e => setEditInstallCmd(e.target.value)}
               className="font-mono text-sm bg-background flex-1"
-              placeholder="npm install --legacy-peer-deps"
+              placeholder="npm install --legacy-peer-deps --ignore-engines"
             />
-            {editInstallCmd !== null && editInstallCmd !== (bot.installCommand ?? "npm install --legacy-peer-deps") && (
+            {editInstallCmd !== null && editInstallCmd !== (bot.installCommand ?? "npm install --legacy-peer-deps --ignore-engines") && (
               <Button size="sm" onClick={handleSaveInstallCmd} disabled={updateBot.isPending}>
                 Salvar
               </Button>
             )}
           </div>
           <p className="text-xs text-muted-foreground">
-            Use <code className="text-primary">--legacy-peer-deps</code> se houver conflito de dependências (comum em bots baileys).
+            Use <code className="text-primary">--legacy-peer-deps --ignore-engines</code> para compatibilidade com Node 24 (comum em bots baileys).
           </p>
         </CardContent>
       </Card>
 
-      {/* GitHub token config */}
       <Card className="border-border bg-card">
         <CardHeader className="pb-3">
           <CardTitle className="text-xs uppercase tracking-widest text-muted-foreground flex items-center gap-2">
@@ -377,7 +378,6 @@ export default function BotDetail() {
         </CardContent>
       </Card>
 
-      {/* Terminal */}
       <div className="space-y-3">
         <h3 className="text-sm font-medium flex items-center gap-2 text-muted-foreground uppercase tracking-widest">
           <TerminalIcon className="w-4 h-4" /> Terminal ao Vivo
@@ -385,7 +385,6 @@ export default function BotDetail() {
         <Terminal botId={botId} status={bot.status} />
       </div>
 
-      {/* Danger zone */}
       <div className="border border-destructive/30 rounded-lg p-4 space-y-3 bg-destructive/5">
         <div className="flex items-center gap-2 text-destructive">
           <AlertTriangle className="w-4 h-4" />

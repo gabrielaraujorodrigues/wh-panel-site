@@ -39,12 +39,10 @@ setDbRestartCallback(async (botId, pid) => {
     .where(eq(botsTable.id, botId));
 });
 
-/** Build an authenticated clone URL if the plain URL + token are provided */
 function buildCloneUrl(gitUrl: string, gitToken?: string | null): string {
   if (!gitToken) return gitUrl;
   try {
     const u = new URL(gitUrl);
-    // Inject token into URL: https://token@github.com/user/repo
     u.username = gitToken;
     u.password = "";
     return u.toString();
@@ -78,10 +76,18 @@ router.get("/system/info", (_req, res) => {
   });
 });
 
+// ─── In-memory cache for GET /bots (1 s TTL) ────────────────────────────────
+let _botsCache: { data: ReturnType<typeof formatBot>[]; ts: number } | null = null;
+function invalidateBotsCache() { _botsCache = null; }
+
 // ─── List bots ───────────────────────────────────────────────────────────────
 
 router.get("/bots", async (req, res) => {
   try {
+    if (_botsCache && Date.now() - _botsCache.ts < 1000) {
+      res.setHeader("Cache-Control", "no-store");
+      return res.json(_botsCache.data);
+    }
     const bots = await db.select().from(botsTable).orderBy(botsTable.id);
     for (const bot of bots) {
       if (!isRunning(bot.id, bot.pid) && (bot.status === "running" || bot.status === "starting")) {
@@ -89,7 +95,10 @@ router.get("/bots", async (req, res) => {
         bot.pid = null;
       }
     }
-    return res.json(bots.map(formatBot));
+    const result = bots.map(formatBot);
+    _botsCache = { data: result, ts: Date.now() };
+    res.setHeader("Cache-Control", "no-store");
+    return res.json(result);
   } catch (err) {
     req.log.error({ err }, "Failed to list bots");
     return res.status(500).json({ error: "Internal server error" });
@@ -116,6 +125,7 @@ router.post("/bots", async (req, res) => {
     const botDir = getBotDir(bot.id);
     const cloneUrl = buildCloneUrl(body.gitUrl, body.gitToken);
 
+    invalidateBotsCache();
     res.status(201).json(formatBot(bot));
 
     try {
@@ -174,6 +184,7 @@ router.patch("/bots/:id", async (req, res) => {
     if (body.installCommand !== undefined) updates.installCommand = body.installCommand;
 
     const [updated] = await db.update(botsTable).set(updates).where(eq(botsTable.id, id)).returning();
+    invalidateBotsCache();
     return res.json(formatBot(updated));
   } catch (err) {
     req.log.error({ err }, "Failed to update bot");
@@ -197,6 +208,7 @@ router.delete("/bots/:id", async (req, res) => {
     }
 
     await db.delete(botsTable).where(eq(botsTable.id, id));
+    invalidateBotsCache();
     return res.status(204).send();
   } catch (err) {
     req.log.error({ err }, "Failed to delete bot");
@@ -227,6 +239,7 @@ router.post("/bots/:id/start", async (req, res) => {
       .where(eq(botsTable.id, id))
       .returning();
 
+    invalidateBotsCache();
     return res.json(formatBot(updated));
   } catch (err) {
     req.log.error({ err }, "Failed to start bot");
@@ -248,6 +261,7 @@ router.post("/bots/:id/stop", async (req, res) => {
       .where(eq(botsTable.id, id))
       .returning();
 
+    invalidateBotsCache();
     return res.json(formatBot(updated));
   } catch (err) {
     req.log.error({ err }, "Failed to stop bot");
@@ -264,7 +278,7 @@ router.post("/bots/:id/restart", async (req, res) => {
     if (!bot) return res.status(404).json({ error: "Bot not found" });
 
     stopProcess(id);
-    await new Promise(r => setTimeout(r, 1500));
+    await new Promise(r => setTimeout(r, 500));
 
     const botDir = getBotDir(id);
     if (!fs.existsSync(botDir)) {
@@ -277,6 +291,7 @@ router.post("/bots/:id/restart", async (req, res) => {
       .where(eq(botsTable.id, id))
       .returning();
 
+    invalidateBotsCache();
     return res.json(formatBot(updated));
   } catch (err) {
     req.log.error({ err }, "Failed to restart bot");
@@ -297,12 +312,11 @@ router.post("/bots/:id/install", async (req, res) => {
       return res.status(400).json({ error: "Diretório do bot não encontrado." });
     }
 
-    // Determine install command: explicit > auto-detect > default
     let installCmd = bot.installCommand;
     if (!installCmd) {
       const hasYarn = fs.existsSync(`${botDir}/yarn.lock`);
       const hasPnpm = fs.existsSync(`${botDir}/pnpm-lock.yaml`);
-      installCmd = hasPnpm ? "pnpm install" : hasYarn ? "yarn install" : "npm install --legacy-peer-deps";
+      installCmd = hasPnpm ? "pnpm install" : hasYarn ? "yarn install" : "npm install --legacy-peer-deps --ignore-engines";
     }
 
     exec(installCmd, { cwd: botDir, timeout: 300000 }, (err, stdout, stderr) => {
@@ -330,7 +344,6 @@ router.post("/bots/:id/pull", async (req, res) => {
       return res.status(400).json({ error: "Repositório não clonado ainda." });
     }
 
-    // If bot has token, configure git credential for pull
     const token = bot.gitToken;
     const pullCmd = token
       ? `git -C "${botDir}" -c credential.helper= -c http.extraHeader="Authorization: Bearer ${token}" pull`

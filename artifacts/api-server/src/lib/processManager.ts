@@ -19,6 +19,13 @@ processEmitter.setMaxListeners(100);
 const runningProcesses = new Map<number, BotProcess>();
 const MAX_LOG_LINES = 500;
 
+type DbRestartCallback = (botId: number, pid: number) => Promise<void>;
+let _dbRestartCallback: DbRestartCallback | null = null;
+
+export function setDbRestartCallback(cb: DbRestartCallback): void {
+  _dbRestartCallback = cb;
+}
+
 export function getBotDir(botId: number): string {
   return path.join(BOTS_DIR, `bot_${botId}`);
 }
@@ -44,8 +51,6 @@ export function isRunning(botId: number, fallbackPid?: number | null): boolean {
       return false;
     }
   }
-  // After API server restart the in-memory map is empty but the bot process
-  // may still be alive — check the PID stored in the database.
   if (fallbackPid) {
     try {
       process.kill(fallbackPid, 0);
@@ -63,7 +68,7 @@ export function getLogs(botId: number): string {
   return bp.logs.join("");
 }
 
-export function startProcess(botId: number, command: string): BotProcess {
+export function startProcess(botId: number, command: string, autoRestart?: boolean): BotProcess {
   const botDir = getBotDir(botId);
 
   if (!fs.existsSync(botDir)) {
@@ -80,19 +85,14 @@ export function startProcess(botId: number, command: string): BotProcess {
     cwd: botDir,
     env: {
       ...process.env,
-      // Performance: run in production mode so V8 optimizes fully
       NODE_ENV: "production",
-      // Terminal color support
       TERM: "xterm-256color",
       FORCE_COLOR: "1",
-      // Increase Node.js memory limit for heavy bots (2 GB)
       NODE_OPTIONS: "--max-old-space-size=2048",
-      // Disable source maps in production for faster startup
       NODE_NO_WARNINGS: "1",
     },
     stdio: ["pipe", "pipe", "pipe"],
     shell: true,
-    // Detached so the bot stays alive independently of the panel process tree
     detached: false,
   });
 
@@ -105,18 +105,15 @@ export function startProcess(botId: number, command: string): BotProcess {
 
   runningProcesses.set(botId, bp);
 
-  // Raise bot process priority for snappier WhatsApp command responses
   if (bp.pid) {
     try {
-      // -5 = higher priority (nice level), valid without root
-      process.kill(bp.pid, 0); // confirm alive
+      process.kill(bp.pid, 0);
       require("child_process").execSync(`renice -n -5 -p ${bp.pid} 2>/dev/null || true`);
     } catch {
-      // non-fatal — priority boost is best-effort
+      // non-fatal
     }
   }
 
-  // Strip ANSI escape codes so the terminal shows clean text
   const stripAnsi = (str: string) =>
     str.replace(/\x1B(?:\[[0-9;]*[mGKHFJ]|\][^\x07]*\x07|[()][A-Z0-9])/g, "");
 
@@ -136,6 +133,20 @@ export function startProcess(botId: number, command: string): BotProcess {
     logger.info({ botId, code }, "Bot process exited");
     processEmitter.emit(`exit:${botId}`, code);
     runningProcesses.delete(botId);
+
+    if (autoRestart && code !== 0) {
+      logger.info({ botId }, "Auto-restarting bot after crash");
+      setTimeout(async () => {
+        try {
+          const restarted = startProcess(botId, command, autoRestart);
+          if (_dbRestartCallback && restarted.pid) {
+            await _dbRestartCallback(botId, restarted.pid);
+          }
+        } catch (err) {
+          logger.error({ botId, err }, "Auto-restart failed");
+        }
+      }, 3000);
+    }
   });
 
   child.on("error", (err) => {
@@ -154,7 +165,6 @@ export function stopProcess(botId: number): boolean {
 
   try {
     process.kill(bp.pid, "SIGTERM");
-    // Force-kill after 5 s if still alive
     setTimeout(() => {
       if (isRunning(botId)) {
         try { process.kill(bp.pid, "SIGKILL"); } catch {}

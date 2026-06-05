@@ -11,9 +11,11 @@ export interface BotInput {
   name: string;
   /** @minLength 1 */
   gitUrl: string;
-  /**
-     * Command to start the bot, e.g. 'node index.js' or 'npm start'
-     * @minLength 1
-     */
+  /** @minLength 1 */
   command: string;
+  autoRestart?: boolean;
+  /** GitHub token for private repositories */
+  gitToken?: string;
+  /** Dependency install command (default: npm install --legacy-peer-deps) */
+  installCommand?: string;
 }

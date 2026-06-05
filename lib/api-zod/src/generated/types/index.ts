@@ -15,4 +15,5 @@ export * from './healthStatus';
 export * from './logsResponse';
 export * from './okResponse';
 export * from './pullResult';
+export * from './systemInfo';
 export * from './terminalInput';

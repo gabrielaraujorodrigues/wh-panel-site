@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Dashboard() {
-  const { data: bots, isLoading } = useListBots({ query: { refetchInterval: 3000 } });
+  const { data: bots, isLoading } = useListBots({ query: { refetchInterval: 5000 } });
 
   const getStatusBadge = (status: string) => {
     switch (status) {

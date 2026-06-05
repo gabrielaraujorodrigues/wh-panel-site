@@ -7,9 +7,6 @@ import { logger } from "./lib/logger";
 
 const app: Express = express();
 
-// Compress all responses — reduces bandwidth, speeds up the frontend
-app.use(compression());
-
 app.use(
   pinoHttp({
     logger,
@@ -22,21 +19,17 @@ app.use(
         };
       },
       res(res) {
-        return { statusCode: res.statusCode };
+        return {
+          statusCode: res.statusCode,
+        };
       },
     },
   }),
 );
-
+app.use(compression());
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-// Keep-alive for faster persistent connections
-app.use((_req, res, next) => {
-  res.setHeader("Connection", "keep-alive");
-  next();
-});
 
 app.use("/api", router);
 

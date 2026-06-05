@@ -15,6 +15,17 @@ export interface Bot {
   status: BotStatus;
   /** @nullable */
   pid?: number | null;
+  autoRestart: boolean;
+  /**
+     * GitHub token for private repositories
+     * @nullable
+     */
+  gitToken?: string | null;
+  /**
+     * Custom dependency install command (e.g. npm install --legacy-peer-deps)
+     * @nullable
+     */
+  installCommand?: string | null;
   createdAt: string;
   updatedAt?: string;
 }

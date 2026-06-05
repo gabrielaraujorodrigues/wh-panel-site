@@ -18,7 +18,8 @@ import { Link } from "wouter";
 import { Badge } from "@/components/ui/badge";
 
 const INSTALL_OPTIONS = [
-  { label: "npm install --legacy-peer-deps  (recomendado)", value: "npm install --legacy-peer-deps" },
+  { label: "npm install --legacy-peer-deps --ignore-engines  (recomendado Node 24)", value: "npm install --legacy-peer-deps --ignore-engines" },
+  { label: "npm install --legacy-peer-deps", value: "npm install --legacy-peer-deps" },
   { label: "npm install", value: "npm install" },
   { label: "yarn install", value: "yarn install" },
   { label: "pnpm install", value: "pnpm install" },
@@ -47,12 +48,11 @@ export default function NewBot() {
       gitUrl: "",
       gitToken: "",
       command: "node index.js",
-      installCommand: "npm install --legacy-peer-deps",
+      installCommand: "npm install --legacy-peer-deps --ignore-engines",
       autoRestart: true,
     },
   });
 
-  // Auto-detect start command based on known bot patterns
   const gitUrl = form.watch("gitUrl");
   useEffect(() => {
     if (gitUrl.includes("jordan-bot") || gitUrl.includes("whatsapp") || gitUrl.includes("baileys")) {
@@ -106,12 +106,11 @@ export default function NewBot() {
         </div>
       </div>
 
-      {/* Node info banner */}
       <div className="flex items-center gap-3 px-4 py-3 rounded-lg border border-primary/20 bg-primary/5 text-sm">
         <Cpu className="w-4 h-4 text-primary shrink-0" />
         <span className="text-muted-foreground">Ambiente:</span>
         <Badge variant="outline" className="border-primary/30 text-primary font-mono text-xs">
-          Node.js {sysInfo?.nodeVersion ?? process.version ?? "v24"}
+          Node.js {sysInfo?.nodeVersion ?? "v24"}
         </Badge>
         <span className="text-muted-foreground text-xs">· {sysInfo?.platform ?? "linux"}</span>
       </div>
@@ -121,7 +120,6 @@ export default function NewBot() {
           <form onSubmit={form.handleSubmit(onSubmit)}>
             <CardContent className="space-y-5 pt-6">
 
-              {/* Name */}
               <FormField control={form.control} name="name" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Nome da Instância</FormLabel>
@@ -132,7 +130,6 @@ export default function NewBot() {
                 </FormItem>
               )} />
 
-              {/* Git URL */}
               <FormField control={form.control} name="gitUrl" render={({ field }) => (
                 <FormItem>
                   <FormLabel>URL do Repositório Git</FormLabel>
@@ -152,7 +149,6 @@ export default function NewBot() {
                 </FormItem>
               )} />
 
-              {/* Git Token */}
               <FormField control={form.control} name="gitToken" render={({ field }) => (
                 <FormItem>
                   <FormLabel className="flex items-center gap-1.5">
@@ -169,13 +165,12 @@ export default function NewBot() {
                     />
                   </FormControl>
                   <FormDescription>
-                    Necessário somente para repositórios privados. Gere em GitHub → Settings → Developer settings → Personal access tokens.
+                    Necessário somente para repositórios privados.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
               )} />
 
-              {/* Command */}
               <FormField control={form.control} name="command" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Comando de Início</FormLabel>
@@ -190,7 +185,6 @@ export default function NewBot() {
                 </FormItem>
               )} />
 
-              {/* Install Command */}
               <FormField control={form.control} name="installCommand" render={({ field }) => (
                 <FormItem>
                   <FormLabel className="flex items-center gap-1.5">
@@ -216,20 +210,19 @@ export default function NewBot() {
                         ))}
                       </div>
                       <Input
-                        placeholder="npm install --legacy-peer-deps"
+                        placeholder="npm install --legacy-peer-deps --ignore-engines"
                         className="font-mono bg-background text-sm"
                         {...field}
                       />
                     </div>
                   </FormControl>
                   <FormDescription>
-                    Usado ao clicar em "Instalar Deps". Use <code className="text-primary">--legacy-peer-deps</code> se houver conflito de dependências.
+                    Use <code className="text-primary">--ignore-engines</code> para compatibilidade com Node 24.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
               )} />
 
-              {/* Auto-restart */}
               <FormField control={form.control} name="autoRestart" render={({ field }) => (
                 <FormItem className="flex items-center justify-between rounded-lg border border-border p-4 bg-muted/20">
                   <div className="space-y-0.5">

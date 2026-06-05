@@ -13,4 +13,7 @@ export interface BotUpdate {
   command?: string;
   /** @minLength 1 */
   gitUrl?: string;
+  autoRestart?: boolean;
+  gitToken?: string;
+  installCommand?: string;
 }
