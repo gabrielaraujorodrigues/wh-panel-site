@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { useGetBotLogs, useSendTerminalInput } from "@workspace/api-client-react";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { TerminalSquare, Send } from "lucide-react";
@@ -26,14 +25,12 @@ export function Terminal({ botId, status }: TerminalProps) {
   
   const sendInput = useSendTerminalInput();
 
-  // Load initial logs
   useEffect(() => {
     if (initialLogs?.logs && !isConnected) {
       setLogs(initialLogs.logs.split('\n').filter(Boolean));
     }
   }, [initialLogs, isConnected]);
 
-  // WebSocket Connection
   useEffect(() => {
     if (status === "running" || status === "starting") {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -65,7 +62,6 @@ export function Terminal({ botId, status }: TerminalProps) {
     }
   }, [botId, status]);
 
-  // Auto scroll
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -76,7 +72,6 @@ export function Terminal({ botId, status }: TerminalProps) {
     e.preventDefault();
     if (!input.trim() || status !== "running") return;
     
-    // Echo local input optimistically
     setLogs(prev => [...prev, `> ${input}`]);
     
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -130,7 +125,7 @@ export function Terminal({ botId, status }: TerminalProps) {
           type="submit" 
           size="icon" 
           variant="ghost" 
-          disabled={status !== "running" && status !== "starting" || !input.trim()}
+          disabled={(status !== "running" && status !== "starting") || !input.trim()}
           data-testid="button-terminal-send"
         >
           <Send className="w-4 h-4" />
